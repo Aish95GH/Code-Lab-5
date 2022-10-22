@@ -1,0 +1,83 @@
+version: '3.9'
+
+services:
+
+  consumer: 
+    build: ./consumer/
+    hostname: consumer
+    environment:
+      - API_HOST=${API_HOST}
+      - API_PORT=${API_PORT}
+      - CONSUMER_PORT=${CONSUMER_PORT}
+  
+    command: python consumer.py 
+    volumes:
+      - ./consumer/code:/app
+    ports:
+      - "${CONSUMER_PORT}:${CONSUMER_PORT}"
+    depends_on:
+      - api
+
+  api:
+    build: ./api/
+    hostname: ${API_HOST}
+    environment:
+      - API_PORT=${API_PORT}
+      
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${PG_PORT}
+      - POSTGRES_USER=${PG_USER}
+      - POSTGRES_PASSWORD=${PG_PASS}
+      - POSTGRES_DB=${PG_DB}
+    command: python api.py
+    volumes:
+      - ./api/code:/app
+    ports:
+      - "${API_PORT}:${API_PORT}"
+
+    depends_on:
+       
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:12
+    hostname: ${DB_HOST}
+    environment:
+      - POSTGRES_USER=${PG_USER}
+      - POSTGRES_PASSWORD=${PG_PASS}
+    ports:
+      - "${PG_PORT}:${PG_PORT}"
+    volumes:
+      - data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d
+
+    healthcheck:
+      
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    
+
+  dba:
+    image: dpage/pgadmin4:6
+    hostname: dba
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PG_ADMIN_NAME}
+      - PGADMIN_DEFAULT_PASSWORD=${PG_ADMIN_PASS}
+      - PGADMIN_LISTEN_PORT=${PG_ADMIN_PORT}
+
+    ports:
+      - "${PG_ADMIN_PORT}:${PG_ADMIN_PORT}"
+
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+    
+    depends_on:
+          - db
+
+volumes:
+  data:
+  pgadmin:
+
